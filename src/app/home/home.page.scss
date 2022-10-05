@@ -1,0 +1,48 @@
+.device-connected{
+  display: flex;
+  align-items: center;
+
+  .content{
+    flex: 1;
+
+    .label{
+      margin-bottom: 8px;
+    }
+  }
+
+  .button-disconnect{
+    --padding-start: 8px;
+    --padding-end: 8px;
+
+    ion-icon{
+      font-size: 24pt;
+    }
+  }
+
+}
+
+.data {
+  
+  ion-button{
+    width: 100%;
+  }
+}
+
+ion-modal#modal-scan-devices{
+  --max-width: 80%;
+  --height: 450px;
+  --max-height: 80%;
+  --border-radius: 16px;
+
+  ion-content{
+    ion-item{
+      --border-radius: 8px;
+    }
+  }
+
+  ion-footer{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+}

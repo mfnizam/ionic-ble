@@ -1,0 +1,70 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Raspi BLE</ion-title>
+    <ion-buttons *ngIf="!deviceConnected?.deviceId" slot="end" (click)="scanDevices(modalScanDevices)">
+      <ion-button>Scan Device</ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <ion-card mode="ios" class="ion-padding">
+    <div *ngIf="deviceConnected; else noDeviceConnected" class="device-connected">
+      <div class="content">
+        <div class="label"><small>Device Connected</small></div>
+        <h4 class="ion-no-margin">
+          <ion-text color="primary"><b>{{deviceConnected.name}}</b></ion-text>
+        </h4>
+        <!-- <ion-text>{{deviceConnected.deviceId}}</ion-text> -->
+      </div>
+      <ion-button color="danger" class="button-disconnect" (click)="disconnectDevice()">
+        <ion-icon slot="icon-only" name="power-outline"></ion-icon>
+      </ion-button>
+    </div>
+    <ng-template #noDeviceConnected>
+      No Device Connected
+    </ng-template>
+  </ion-card>
+  
+  <ion-card *ngIf="deviceConnected" mode="ios" class="ion-padding data">
+    <ion-grid class="ion-text-center">
+      <ion-row>
+        <ion-col style="font-size: 42pt;"><b>{{dataTemp}}</b></ion-col>
+      </ion-row>
+      <ion-row>
+        <ion-col>
+          <ion-button fill="outline" (click)="requestUpdateTempData()">Update</ion-button>
+        </ion-col>
+        <ion-col>
+          <ion-button fill="outline" (click)="requestChangeUnitData()">Change to {{dataUnit === 'F'? 'Celcius' : 'Fahrenheit'}}</ion-button>
+        </ion-col>
+      </ion-row>
+    </ion-grid>
+  </ion-card>
+  
+
+  <ion-modal #modalScanDevices id="modal-scan-devices" mode="ios" showBackdrop="true" (didDismiss)="onModalScanDevicesDidDismiss($event)">
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-title class="ion-padding">Scanning Devices...</ion-title>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding">
+        <ion-radio-group>
+          <ion-item *ngFor="let device of bluetoothScanResults">
+            <ion-label>
+              <h2>{{device.device.name}}</h2>
+              <ion-text color="medium">{{device.device.deviceId}}</ion-text>
+            </ion-label>
+            <ion-radio mode="md" slot="end" [value]="device.device.deviceId"></ion-radio>
+          </ion-item>
+        </ion-radio-group>
+      </ion-content>
+      <ion-footer class="ion-padding">
+        <ion-button fill="outline">Cancel</ion-button>
+        <ion-button>Connect</ion-button>
+      </ion-footer>
+    </ng-template>
+  </ion-modal>
+</ion-content>
