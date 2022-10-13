@@ -1,8 +1,8 @@
 import { Component, NgZone } from '@angular/core';
-import { BleClient, BleDevice, numberToUUID, ScanResult, dataViewToText, textToDataView } from '@capacitor-community/bluetooth-le';
+import { BleClient, BleDevice, numberToUUID, ScanResult, dataViewToText, textToDataView, BleCharacteristic } from '@capacitor-community/bluetooth-le';
 import { Capacitor } from '@capacitor/core';
 import { AlertController, LoadingController, ToastController } from '@ionic/angular';
-import { ConnectedDevices } from './home.interfaces';
+import { Characteristic, ConnectedDevices } from './home.interfaces';
 
 @Component({
   selector: 'app-home',
@@ -14,14 +14,29 @@ export class HomePage {
   connectDeviceLoading;
   disconnectDeviceLoading;
 
-  // dataTemp = '0 F'; //°C
-  // dataUnit = 'F';
-
-  THERMOMETER_SERVICE_UUID = "00000001-710e-4a5b-8d75-3e5b444bc3cf";
-  HEART_RATE_SERVICE = '0000180d-0000-1000-8000-00805f9b34fb';
-  // TEMP_CHARACTERISTIC_UUID = "00000002-710e-4a5b-8d75-3e5b444bc3cf";
-  // UNIT_CHARACTERISTIC_UUID = "00000003-710e-4a5b-8d75-3e5b444bc3cf";
-
+  THERMOMETER_SERVICE_UUID = [
+    "00000001-710e-4a5b-8d75-3e5b444bc3cf",
+    "00000011-710e-4a5b-8d75-3e5b444bc3cf",
+    "00000021-710e-4a5b-8d75-3e5b444bc3cf",
+    "00000031-710e-4a5b-8d75-3e5b444bc3cf",
+    "00000041-710e-4a5b-8d75-3e5b444bc3cf",
+    "00000051-710e-4a5b-8d75-3e5b444bc3cf",
+    "00000061-710e-4a5b-8d75-3e5b444bc3cf",
+    "00000071-710e-4a5b-8d75-3e5b444bc3cf",
+    "00000081-710e-4a5b-8d75-3e5b444bc3cf",
+    "00000091-710e-4a5b-8d75-3e5b444bc3cf",
+    "00000101-710e-4a5b-8d75-3e5b444bc3cf",
+    "00000111-710e-4a5b-8d75-3e5b444bc3cf",
+    "00000121-710e-4a5b-8d75-3e5b444bc3cf",
+    "00000131-710e-4a5b-8d75-3e5b444bc3cf",
+    "00000141-710e-4a5b-8d75-3e5b444bc3cf",
+    "00000151-710e-4a5b-8d75-3e5b444bc3cf",
+    "00000161-710e-4a5b-8d75-3e5b444bc3cf",
+    "00000171-710e-4a5b-8d75-3e5b444bc3cf",
+    "00000181-710e-4a5b-8d75-3e5b444bc3cf",
+    "00000191-710e-4a5b-8d75-3e5b444bc3cf",
+  ]
+ 
   constructor(
     private toast: ToastController,
     private ngZone: NgZone,
@@ -29,8 +44,7 @@ export class HomePage {
     private alert: AlertController
   ) { }
 
-  async scanDevices(modal) {
-
+  async scanDevices() {
     try {
       if (!await BleClient.isEnabled()) throw 'Please enable your bluetooth.';
 
@@ -39,8 +53,8 @@ export class HomePage {
       let deviceConnected;
       deviceConnected = await BleClient.requestDevice({
         services: [],
-        namePrefix: 'rn',
-        optionalServices: [this.THERMOMETER_SERVICE_UUID],
+        namePrefix: 'Stampede',
+        optionalServices: this.THERMOMETER_SERVICE_UUID
       });
 
       if (this.connectedDevices.findIndex(v => v.deviceId === deviceConnected.deviceId) != -1)
@@ -55,14 +69,17 @@ export class HomePage {
       // connect to device
       await BleClient.connect(deviceConnected.deviceId, this.onDeviceDisconnected.bind(this));
       let deviceConnectedServices = await BleClient.getServices(deviceConnected.deviceId).catch(err => console.log(err));
-      console.log(deviceConnectedServices)
+
       this.connectedDevices.push({
         ...deviceConnected,
         services: deviceConnectedServices
       })
-      console.log(this.connectedDevices)
+      console.log(this.connectedDevices, deviceConnectedServices)
 
       if (this.connectDeviceLoading) await this.connectDeviceLoading.dismiss();
+
+      await this.getCharacteristicDescription(this.connectedDevices[this.connectedDevices.length - 1]);
+
     } catch (error) {
       console.error(error);
 
@@ -72,7 +89,8 @@ export class HomePage {
         message: error?.toString() || 'Terjadi Kesalahan. Periksa Bluetooth Anda.',
         mode: 'ios',
         duration: 3000,
-        color: 'danger'
+        color: 'danger',
+        buttons: [{ icon: 'close' }]
       })
       toast.present();
     }
@@ -93,7 +111,7 @@ export class HomePage {
       buttons: [{ icon: 'close' }]
     })
     toastDeviceDisconnected.present();
-
+    console.log('Device ' + this.connectedDevices[indexDisconnectedDevice]?.name + ' disconnected')
     this.connectedDevices.splice(indexDisconnectedDevice, 1)
   }
 
@@ -123,7 +141,7 @@ export class HomePage {
       })
 
       // TODO: add disconnect all service on the device
-      
+
       this.disconnectDeviceLoading.present();
       await BleClient.disconnect(deviceId);
     } catch (error) {
@@ -138,59 +156,113 @@ export class HomePage {
     }
   }
 
-  // async startTempNotification() {
-  //   await BleClient.startNotifications(
-  //     this.deviceConnected.deviceId,
-  //     this.THERMOMETER_SERVICE_UUID,
-  //     this.TEMP_CHARACTERISTIC_UUID,
-  //     (value) => {
-  //       console.log('current heart rate', dataViewToText(value));
-  //       this.ngZone.run(() => {
-  //         this.dataTemp = dataViewToText(value);
-  //         this.dataUnit = this.dataTemp.replace(/[^a-zA-Z]+/g, '');
-  //       });
-  //     }
-  //   )
-  // }
+  async readCharacteristic(deviceId: string, serviceUUID: string, characteristic: Characteristic) {
+    try {
+      let result = await BleClient.read(deviceId, serviceUUID, characteristic.uuid);
+      characteristic.value = dataViewToText(result);
+    } catch (error) {
+      console.error(error);
+      let toast = await this.toast.create({
+        message: error?.toString() || 'Terjadi Kesalahan. Coba beberapa saat lagi.',
+        mode: 'ios',
+        duration: 3000,
+        color: 'danger',
+        buttons: [{ icon: 'close' }]
+      })
+      toast.present();
+    }
+  }
 
-  // async stopTempNotification() {
-  //   try {
-  //     await BleClient.stopNotifications(
-  //       this.deviceConnected.deviceId,
-  //       this.THERMOMETER_SERVICE_UUID,
-  //       this.TEMP_CHARACTERISTIC_UUID
-  //     )
-  //   } catch (error) {
-  //     console.log(error)
-  //   }
-  // }
+  async notifyCharacteristic(deviceId: string, serviceUUID: string, characteristic: Characteristic) {
+    try {
+      if (characteristic.isnotify) {
+        await BleClient.stopNotifications(
+          deviceId,
+          serviceUUID,
+          characteristic.uuid
+        )
+        characteristic.isnotify = false;
+        characteristic.value = null;
+        return;
+      }
+      await BleClient.startNotifications(
+        deviceId,
+        serviceUUID,
+        characteristic.uuid,
+        (value) => {
+          characteristic.isnotify = true;
+          console.log('current value', dataViewToText(value));
+          this.ngZone.run(() => {
+            characteristic.value = dataViewToText(value);
+          });
+        }
+      )
+    } catch (error) {
+      console.error(error);
+      let toast = await this.toast.create({
+        message: error?.toString() || 'Terjadi Kesalahan. Coba beberapa saat lagi.',
+        mode: 'ios',
+        duration: 3000,
+        color: 'danger',
+        buttons: [{ icon: 'close' }]
+      })
+      toast.present();
+    }
+  }
 
+  async writeCharacteristic(deviceId: string, serviceUUID: string, characteristic: Characteristic) {
+    const alert = await this.alert.create({
+      header: 'Write Value to Device',
+      mode: 'ios',
+      buttons: [{ text: 'cancel', role: 'cancel' }, { text: 'Send', role: 'ok' }],
+      inputs: [{
+        placeholder: 'Write some value...',
+      }]
+    });
 
-  // async requestUpdateTempData() {
-  //   if (!this.deviceConnected?.deviceId) {
-  //     let toastNoDevice = await this.toast.create({
-  //       message: 'Unable to Update Data, No Device Connected',
-  //       mode: 'ios',
-  //       color: 'danger',
-  //       duration: 3000,
-  //       buttons: [{ icon: 'close' }]
-  //     })
-  //     toastNoDevice.present();
-  //     return;
-  //   }
-  //   const result = await BleClient.read(this.deviceConnected.deviceId, this.THERMOMETER_SERVICE_UUID, this.TEMP_CHARACTERISTIC_UUID);
-  //   console.log('temp: ', dataViewToText(result));
-  //   this.dataTemp = dataViewToText(result)
-  //   this.dataUnit = this.dataTemp.replace(/[^a-zA-Z]+/g, '');
-  // }
+    await alert.present();
+    let { data, role } = await alert.onDidDismiss();
+    if (role !== 'ok') return;
 
-  // async requestChangeUnitData() {
-  //   await BleClient.write(
-  //     this.deviceConnected.deviceId,
-  //     this.THERMOMETER_SERVICE_UUID,
-  //     this.UNIT_CHARACTERISTIC_UUID,
-  //     textToDataView(this.dataUnit === 'F' ? 'C' : 'F')
-  //   )
-  //   this.requestUpdateTempData();
-  // }
+    try {
+      await BleClient.write(
+        deviceId,
+        serviceUUID,
+        characteristic.uuid,
+        textToDataView(data.values[0])
+      )
+      this.readCharacteristic(deviceId, serviceUUID, characteristic)
+    } catch (error) {
+      console.error(error);
+      let toast = await this.toast.create({
+        message: error?.toString() || 'Terjadi Kesalahan. Coba beberapa saat lagi.',
+        mode: 'ios',
+        duration: 3000,
+        color: 'danger',
+        buttons: [{ icon: 'close' }]
+      })
+      toast.present();
+    }
+  }
+
+  async getCharacteristicDescription(device: ConnectedDevices) {
+    try {
+      for (let i = 0; i < device.services.length; i++) {
+        let service = device.services[i];
+        for (let j = 0; j < service.characteristics.length; j++) {
+          let characteristic = service.characteristics[j];
+          await this.readDescription(device.deviceId, service.uuid, characteristic)
+        }
+      }
+    } catch (error) {
+      console.log(error)
+      console.log("unable to get characteristic description")
+    }
+  }
+
+  async readDescription(deviceId: string, serviceUUID: string, characteristic: Characteristic) {
+    let description = await BleClient.readDescriptor(deviceId, serviceUUID, characteristic.uuid, "00002901-0000-1000-8000-00805f9b34fb" /* descriptor.uuid */);
+    console.log(dataViewToText(description))
+    characteristic.description = dataViewToText(description)
+  }
 }

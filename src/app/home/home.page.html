@@ -1,7 +1,7 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>Raspi BLE</ion-title>
-    <ion-buttons *ngIf="!deviceConnected?.deviceId" slot="end" (click)="scanDevices(modalScanDevices)">
+    <ion-title>Stampede BLE</ion-title>
+    <ion-buttons *ngIf="!deviceConnected?.deviceId" slot="end" (click)="scanDevices()">
       <ion-button mode="ios">+ Add Device</ion-button>
     </ion-buttons>
   </ion-toolbar>
@@ -10,7 +10,7 @@
 <ion-content>
   <div *ngIf="connectedDevices.length > 0; else noDevicesConnected">
     <ion-card *ngFor="let device of connectedDevices" mode="ios" class="ion-padding">
-      <div class="device-connected">
+      <div class="device-connected ion-margin-bottom">
         <div class="content">
           <div class="label"><small>Device Name</small></div>
           <h4 class="ion-no-margin">
@@ -21,6 +21,27 @@
           <ion-icon slot="icon-only" name="power-outline"></ion-icon>
         </ion-button>
       </div>
+      <div *ngFor="let service of device.services; let i = index;" class="service ion-margin-bottom">
+        <div class="ion-padding">
+          <div><b>Service {{i}}</b></div>
+          <small class="ion-text-capitalize">UUID: {{service.uuid}}</small>
+        </div>
+        <hr class="ion-no-margin">
+        <div class="ion-padding-start ion-padding-end">
+          <div *ngFor="let characteristic of service.characteristics; let i = index;" class="characteristic">
+            <div><b>{{characteristic.description || 'Characteristic ' + i}}</b></div>
+            <div><small>UUID: {{characteristic.uuid}}</small></div>
+            <!-- <div><small>Description: {{characteristic.description}} <ion-text color="primary" (click)="readDescription(device.deviceId, service.uuid, characteristic)">(Read)</ion-text></small></div> -->
+            <div>Value: <ion-text color="primary"><b>{{characteristic.value || '-'}}</b></ion-text></div>
+            <div *ngIf="characteristic.properties as property" class="properties ion-margin-top">
+              <ion-button *ngIf="property.read" size="small" (click)="readCharacteristic(device.deviceId, service.uuid, characteristic)">Read</ion-button>
+              <ion-button *ngIf="property.write" size="small" (click)="writeCharacteristic(device.deviceId, service.uuid, characteristic)">Write</ion-button>
+              <ion-button *ngIf="property.notify" size="small" [color]="characteristic.isnotify? 'danger' : ''" (click)="notifyCharacteristic(device.deviceId, service.uuid, characteristic)"> {{ characteristic.isnotify? 'Stop' : 'Start' }} Notify</ion-button>
+            </div>
+            <!-- TODO: add descriptors -->
+          </div>
+        </div>
+      </div>
     </ion-card>
   </div>
   <ng-template #noDevicesConnected>
@@ -28,22 +49,4 @@
       <div class="ion-text-center">No Device Connected</div>
     </ion-card>
   </ng-template>
-
-  
-  <!-- <ion-card *ngIf="deviceConnected" mode="ios" class="ion-padding data">
-    <ion-grid class="ion-text-center">
-      <ion-row>
-        <ion-col style="font-size: 42pt;"><b>{{dataTemp}}</b></ion-col>
-      </ion-row>
-      <ion-row>
-        <ion-col>
-          <ion-button fill="outline" (click)="requestUpdateTempData()">Update</ion-button>
-        </ion-col>
-        <ion-col>
-          <ion-button fill="outline" (click)="requestChangeUnitData()">Change to {{dataUnit === 'F'? 'Celcius' : 'Fahrenheit'}}</ion-button>
-        </ion-col>
-      </ion-row>
-    </ion-grid>
-  </ion-card> -->
-  
 </ion-content>
